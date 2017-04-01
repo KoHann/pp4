@@ -5,6 +5,7 @@ import datetime
 import os
 import pickle
 
+
 ### Il faut coder :
 ###     -La gestion des noms de joueurs (c'est un peu bazardeux pour le moment)
 ###     -L'animation du pion qui tombe
