@@ -1,0 +1,513 @@
+from tkinter import*
+from tkinter import messagebox, filedialog
+from math import*
+import datetime
+import os
+import pickle
+
+### Il faut coder :
+###     -La gestion des noms de joueurs (c'est un peu bazardeux pour le moment)
+###     -L'animation du pion qui tombe
+
+##############################WARNING ERROR######################################
+######Toutes les erreurs détectées ont été réglé, si tu en trouves une, comprend 
+######à quel occasion elle apparait et détaille tout ça ici !!!
+######
+######
+
+def annuler_coup():
+    global joueur, coup
+    if len(tableau_partie)>1:
+        Coord = tableau_partie[-1].split(",")			#On récupère les coordonnées du coup précédent situé à la fin de la liste 'tableau_parties' que l'on sépare en deux entrées d'une liste 
+        colonne = int(Coord[0])							#On injecte chaque coordonnée dans une variable distincte
+        ligne = int(Coord[1])
+        rayon_cercle =((min(hauteur/nb_ligne, largeur/nb_colonne))/3) #On recalcule les informations nécessaires à la création du pion mais qui vont nous servir à le supprimer  
+        milieu_x = colonne*(largeur/nb_colonne) + (largeur/nb_colonne)/2
+        milieu_y = ((ligne-nb_ligne)*-1)*(hauteur/nb_ligne) - (hauteur/nb_ligne)/2
+        plateau.create_rectangle(milieu_x-rayon_cercle-1, milieu_y-rayon_cercle-1 ,milieu_x+rayon_cercle+1,milieu_y+rayon_cercle+1, fill="#FFFFFF", width = 0) #On crée un rectangle recouvrant l'intégralité des pixels du pion que l'on souhaite annuler
+        tableau_partie.pop(-1)							#On supprime les coordonnées du pion supprimé de la liste de l'historique de la partie
+        tableau[colonne][ligne] = 0						#On réinitialise la valeur de l'entrée de la liste correspondant à l'emplacement du pion supprimé
+        coup -= 1										#On réduit également le nombre de coup de 1
+        can_compteur.create_rectangle(0,0,largeur, 40, fill="#FFFFFF", width=0)
+        #On réaffiche  le nombre de coups précédent
+        can_compteur.create_text(300,20, text = "Nombre de coup : {}".format(coup), anchor = W, font=("Courier New",9,"")) 
+        #On réaffiche le tour du joueur précédent
+        if tableau_partie[0] == "Running":				#On vérifie si la partie est bien en cours
+            if joueur == 1:
+                joueur = 2
+                color = "#DDDD00"
+            elif joueur == 2:
+                joueur = 1
+                color = "#FF0000"
+        else:											#S'il s'avère que la partie était finie
+            tableau_partie[0] = "Running"				#Elle redevient en cours
+            #On annule de le blocage de la liste effectué à la fin de la partie pour empêcher les joueurs de jouer davantage de pions
+            for loop_colonne in range(nb_colonne):
+                for loop_ligne in range(nb_ligne):
+                    if tableau[loop_colonne][loop_ligne] == 3:
+                        tableau[loop_colonne][loop_ligne] = 0
+            if joueur == 1:
+                color = "#FF0000"
+            else:
+                color = "#DDDD00"  
+        #On remet en place l'indicateur du joueur avec les couleurs définies juste avant              
+        can_compteur.create_text(20,20, text = "Joueur {} :".format(joueur), anchor = W, font=("Courier New",9,""))
+        can_compteur.create_oval(110-10, 20-10, 110+10, 20+10, fill=color)
+    else:
+        messagebox.showinfo("Attention","Il faudrait déjà avoir avancé avant de vouloir revenir sur ses pas.")        
+        
+        
+
+def charger():
+    """Charge une partie en cour ou visualise une partie terminée"""
+
+    def valid_charger():
+        """Charge une partie terminée en mode review ou une partie non terminée sur le plateau principal"""
+
+        def coupsuivant(event = 0):
+            """Permet de visualiser le coup suivant en mode review"""
+            global coup_review, nom_joueur
+            if coup_review == len(tableau_save):
+                pass
+            else:
+                coup_review += 1
+                Coord = tableau_save[coup_review-1].split(",")
+                colonne = int(Coord[0])
+                ligne = int(Coord[1])
+                rayon_cercle =((min(hauteur/nb_ligne, largeur/nb_colonne))/3)
+                milieu_x = colonne*(largeur/nb_colonne) + (largeur/nb_colonne)/2
+                milieu_y = ((ligne-nb_ligne)*-1)*(hauteur/nb_ligne) - (hauteur/nb_ligne)/2
+                if nom_joueur == nom_J1_review:
+                    color = "#FF0000"
+                else:
+                    color = "#DDDD00"
+                plateau_review.create_oval(milieu_x-rayon_cercle, milieu_y-rayon_cercle ,milieu_x+rayon_cercle,milieu_y+rayon_cercle, fill=color)
+                if coup_review == 42:
+                    can_compteur_review.create_rectangle(0,0,largeur, 40, fill="#FFFFFF", width=0)
+                    can_compteur_review.create_text(largeur/2,20, text = "C'est un match nul !", font=("Courier New",15,"bold"))
+                elif coup_review == len(tableau_save):
+                    can_compteur_review.create_rectangle(0,0,largeur, 40, fill="#FFFFFF", width=0)
+                    can_compteur_review.create_text(largeur/2,20, text = "{} a gagné en {} coups !".format(nom_joueur, coup_review), font=("Courier New",15,"bold"))
+                else:
+                    if nom_joueur == nom_J1_review:
+                        nom_joueur = nom_J2_review
+                        color = "#DDDD00"
+                    else:
+                        nom_joueur = nom_J1_review
+                        color = "#FF0000"
+                    can_compteur_review.create_rectangle(0,0,largeur, 40, fill="#FFFFFF", width=0)
+                    can_compteur_review.create_text(300,20, text = "Nombre de coup : {}".format(coup_review), anchor = W, font=("Courier New",9,""))
+                    can_compteur_review.create_text(90,20, text = "{} :".format(nom_joueur), anchor = E, font=("Courier New",9,""))
+                    can_compteur_review.create_oval(110-10, 20-10, 110+10, 20+10, fill=color)
+            
+        def coupprecedent(event = 0):
+            """Permet de visualiser le coup précédent en mode review"""
+            global coup_review, nom_joueur
+            if coup_review == 0:
+                pass
+            else:
+                Coord = tableau_save[coup_review-1].split(",")
+                colonne = int(Coord[0])
+                ligne = int(Coord[1])
+                rayon_cercle =((min(hauteur/nb_ligne, largeur/nb_colonne))/3)
+                milieu_x = colonne*(largeur/nb_colonne) + (largeur/nb_colonne)/2
+                milieu_y = ((ligne-nb_ligne)*-1)*(hauteur/nb_ligne) - (hauteur/nb_ligne)/2
+                plateau_review.create_rectangle(milieu_x-rayon_cercle-1, milieu_y-rayon_cercle-1 ,milieu_x+rayon_cercle+1,milieu_y+rayon_cercle+1, fill="#FFFFFF", width = 0)
+                if nom_joueur == nom_J1_review:
+                    if coup_review != len(tableau_save):
+                        nom_joueur = nom_J2_review
+                        color = "#DDDD00"
+                    else:
+                        color = "#FF0000"
+                else:
+                    if coup_review != len(tableau_save):
+                        nom_joueur = nom_J1_review
+                        color = "#FF0000"
+                    else:
+                        color = "#DDDD00"
+                coup_review -= 1
+                can_compteur_review.create_rectangle(0,0,largeur, 40, fill="#FFFFFF", width=0)
+                can_compteur_review.create_text(300,20, text = "Nombre de coup : {}".format(coup_review), anchor = W, font=("Courier New",9,""))
+                can_compteur_review.create_text(90,20, text = "{} :".format(nom_joueur), anchor = E, font=("Courier New",9,""))
+                can_compteur_review.create_oval(110-10, 20-10, 110+10, 20+10, fill=color)
+                
+        def quit_review():
+            """Ferme le mode review"""
+            fen_review.destroy()
+
+        global fen_review, coup_review, nom_joueur, tableau_partie, plateau_review, coup, can_compteur, joueur
+        try:
+            tableau_save = list(parties_save[((int((liste_parties.curselection())[0])-len(parties_save))*-1)-1]) #Attention ! La copie de liste de python étant particulière, le list() est absolument nécessaire pour ne pas modifier les sauvegardes !
+            if tableau_save[0] == "Running":
+                if messagebox.askyesno("Optimisation de la mémoire", "Voulez-vous conserver cette partie dans l'état où elle a été enregistrée ? Pour une question d'optimisation, nous vous conseillons de ne la conserver qu'en cas de nécessité.") == False:
+                    parties_save.pop(((int((liste_parties.curselection())[0])-len(parties_save))*-1)-1)
+                    with open("parties enregistrées.txt", "wb") as save:
+                        pickle.Pickler(save).dump(parties_save)
+                coup = 0
+                recommencer()
+                name = tableau_save[-1].split(" ")
+                nom_J1_review = name[0]
+                nom_J2_review = name[2]
+                nom_joueur = nom_J1_review
+                tableau_save.pop(-1)
+                coup = len(tableau_save)-1
+                if coup%2 == 0:
+                    joueur = 1
+                    color = "#FF0000"
+                else:
+                    joueur = 2
+                    color = "#DDDD00"
+                can_compteur.create_rectangle(0,0,largeur, 40, fill="#FFFFFF", width=0)
+                can_compteur.create_text(300,20, text = "Nombre de coup : {}".format(coup), anchor = W, font=("Courier New",9,""))
+                can_compteur.create_text(20,20, text = "Joueur {} :".format(joueur), anchor = W, font=("Courier New",9,""))
+                can_compteur.create_oval(110-10, 20-10, 110+10, 20+10, fill=color)
+                tableau_partie = tableau_save
+                for loop in range(coup):
+                    Coord = (tableau_partie[loop+1]).split(",")
+                    colonne = int(Coord[0])
+                    ligne = int(Coord[1])
+                    if (loop+1)%2 == 0:
+                        tableau[colonne][ligne] = 1
+                        color = "#FF0000"
+                    else:
+                        tableau[colonne][ligne] = 2
+                        color = "#DDDD00"
+                    rayon_cercle =((min(hauteur/nb_ligne, largeur/nb_colonne))/3)
+                    milieu_x = colonne*(largeur/nb_colonne) + (largeur/nb_colonne)/2
+                    milieu_y = ((ligne-nb_ligne)*-1)*(hauteur/nb_ligne) - (hauteur/nb_ligne)/2 
+                    plateau.create_oval(milieu_x-rayon_cercle, milieu_y-rayon_cercle ,milieu_x+rayon_cercle,milieu_y+rayon_cercle, fill=color)
+
+            else:
+                tableau_save.pop(0)
+                name = tableau_save[-1].split(" ")
+                nom_J1_review = name[0]
+                nom_J2_review = name[2]
+                nom_joueur = nom_J1_review
+                tableau_save.pop(-1)
+                coup_review = 0
+                fen_review = Tk(className="Puissance 4 review")
+                can_compteur_review = Canvas(fen_review, width = largeur, height = 40, bg = "#FFFFFF")
+                can_compteur_review.create_text(300,20, text = "Nombre de coup : {}".format(coup_review), anchor = W, font=("Courier New",9,""))
+                can_compteur_review.create_text(90,20, text = "{} :".format(nom_J1_review), anchor = E, font=("Courier New",9,""))
+                can_compteur_review.create_oval(110-10, 20-10, 110+10, 20+10, fill="#FF0000")
+                can_compteur_review.pack(side = TOP)
+                plateau_review = Canvas(fen_review, width = largeur, height = hauteur, background = "#FFFFFF")
+                plateau_review.bind("<Button-1>", coupsuivant)
+                plateau_review.bind("<Button-3>", coupprecedent)
+                plateau_review.create_line(3,2,3,hauteur+2, width = 2)
+                plateau_review.create_line(3,3,largeur,3, width = 2)
+                plateau_review.create_line(3,hauteur+1,largeur,hauteur+1, width = 2)
+                plateau_review.create_line(largeur,2,largeur,hauteur+2, width = 2)
+                for loop in range(0,largeur,int(largeur/nb_colonne)):
+                    plateau_review.create_line(loop,0,loop,hauteur, width = 2)
+                for loop in range(0,hauteur,int(hauteur/nb_ligne)):
+                    plateau_review.create_line(0,loop,largeur,loop, width = 2)
+                plateau_review.pack(side = TOP)
+                can_review = Canvas(fen_review, width = largeur, height = 40, bg = "#FFFFFF")
+                Butt_next = Button(can_review, text ="Suivant", command = coupsuivant, relief = RAISED, font=("Courier New",9,""))
+                Butt_next_window = can_review.create_window(largeur/2+10, 20, anchor=W, window=Butt_next)
+                Butt_previous = Button(can_review, text ="Retour ", command = coupprecedent, relief = RAISED, font=("Courier New",9,""))
+                Butt_previous_window = can_review.create_window(largeur/2-10, 20, anchor=E, window=Butt_previous)
+                Butt_quit_review = Button(can_review, text ="Quitter", command = quit_review, relief = RAISED, font=("Courier New",9,""))
+                Butt_quit_review_window = can_review.create_window(largeur-10, 20, anchor=E, window=Butt_quit_review)
+                can_review.pack(side = TOP)
+                fen_review.mainloop()
+        except IndexError:
+            messagebox.showerror("Aucune sélection", "Vous devez sélectionner une partie pour la charger.")
+
+    def cleanner(event):
+        try:
+            parties_save.pop(((((liste_parties.curselection())[0])-(len(parties_save)))*-1)-1)
+            with open("parties enregistrées.txt", "wb") as save:
+                pickle.Pickler(save).dump(parties_save)
+            charger()
+        except:
+            pass
+
+    global Butt_ok_launch, liste_parties
+    cleancommande()
+    liste_parties = Listbox(can_commande, width = 30)
+    for loop in parties_save:
+        liste_parties.insert(0, loop[-1])
+    liste_parties_window = can_commande.create_window(10, 220, anchor=NW, window = liste_parties)
+    Butt_ok_launch = Button(can_commande, text ="Valider", command = valid_charger, relief = RAISED, font=("Courier New",9,""))
+    Butt_ok_launch_window = can_commande.create_window(200/2, 400, window=Butt_ok_launch)
+    liste_parties.bind('<Triple-1>', cleanner)
+    if coup > 0:
+        messagebox.showwarning("Attention", "Charger une partie non terminée va supprimer celle en cours, assurez vous donc de l'avoir sauvegardée si vous souhaitez la continuer.")
+
+def enregistrer():      
+    """Gère l'affichage des règlages et enregistre la partie"""
+    
+    def valid_enregistrer():
+        global tableau_partie
+        global parties_save, coup
+        temps = str(datetime.datetime.now()).split(".")
+        tableau_partie.append("{0} vs {1} : {2}".format(nom_J1.get(),nom_J2.get(),temps[0]))
+        parties_save.append(tableau_partie)
+        with open("parties enregistrées.txt", "wb") as save:
+            pickle.Pickler(save).dump(parties_save)
+        messagebox.showinfo("Action éxécutée","Votre partie a bien été enregistrée.")
+        coup = 0
+        recommencer()
+
+    global Butt_ok_save, Entry_nom_J1, Entry_nom_J2     #On rend les widgets global pour pouvoir les supprimer ensuite
+    global name
+    global tableau_partie
+    cleancommande()
+    if victoire == False and coup !=0:
+        messagebox.showinfo("Partie incomplète", "La partie est toujours en cours. Vous pourrez la continuer plus tard. Il est conseillé de bien remplir vos noms pour pouvoir la retrouver facilement.")
+    if coup == 0:
+    	messagebox.showinfo("Attention","Peut-être faudrait-il débuter la partie avant de vouloir l'enregistrer.")
+    	pass
+    else:
+        can_commande.create_text(10,220, text = "Nom du Joueur 1 :", anchor = W, font=("Courier New",9,""))
+        can_commande.create_text(10,270, text = "Nom du Joueur 2 :", anchor = W, font=("Courier New",9,""))
+        #On instance les futurs noms des deux joueurs
+        nom_J1 = StringVar()
+        nom_J2 = StringVar()
+        #On injecte dans les deux objets-variables une chaîne de caractères par défaut
+        nom_J1.set("Joueur 1")
+        nom_J2.set("Joueur 2")
+        #On crée les deux entrées qui serviront à rensigner les noms des joueurs
+        Entry_nom_J1 = Entry(can_commande, textvariable = nom_J1, width = 30)
+        Entry_nom_J2 = Entry(can_commande, textvariable = nom_J2, width = 30)
+        #On crée les deux fenêtres qui accueillent les deuw lignes de remplissage
+        Entry_nom_J1_window = can_commande.create_window(10, 240, anchor=W, window = Entry_nom_J1)
+        Entry_nom_J2_window = can_commande.create_window(10, 290, anchor=W, window = Entry_nom_J2)
+        #On crée le bouton 'Valider'
+        Butt_ok_save = Button(can_commande, text ="Valider", command = valid_enregistrer, relief = RAISED, font=("Courier New",9,""))
+        Butt_ok_save_window = can_commande.create_window(200/2, 320, window=Butt_ok_save)
+
+    
+def cleancommande():
+    """Nettoie toutes la partie modifiable du canvas de commande"""
+    try:
+        Butt_ok_save.destroy()   
+        Entry_nom_J1.destroy()
+        Entry_nom_J2.destroy()
+    except:
+        pass
+    finally:
+        try:
+            liste_parties.destroy()   
+            Butt_ok_launch.destroy()
+        except:
+            pass
+        finally:
+            can_commande.create_rectangle(0,202,largeur, 400, fill="#FFFFFF", width=0)
+
+def recommencer():
+    """Recommence la partie depuis un bouton"""
+    global can_commande
+    global tableau_partie
+    global tableau
+    global victoire
+    global joueur
+    global coup
+    if victoire == False and coup !=0:
+        messagebox.showinfo("Action impossible", "La partie est toujours en cours. Vous devez la terminer avant de recommencer.")
+    else:												#On réinitialise toutes les variables et les graphismes à l'image d'un début de partie
+        tableau_partie = ["Running"]
+        tableau = [[0 for ligne in range (6)] for colonne in range (7)]
+        victoire = False
+        joueur = 1
+        coup = 0
+        cleancommande()
+        can_compteur.create_rectangle(0,0,largeur, 40, fill="#FFFFFF", width=0)
+        can_compteur.create_text(300,20, text = "Nombre de coup : {}".format(coup), anchor = W, font=("Courier New",9,""))
+        can_compteur.create_text(20,20, text = "Joueur 1 :", anchor = W, font=("Courier New",9,""))
+        can_compteur.create_oval(110-10, 20-10, 110+10, 20+10, fill="#FF0000")
+        plateau.create_rectangle(0,0,largeur, hauteur, fill="#FFFFFF", width=0)
+        plateau.create_line(3,2,3,hauteur+2, width = 2)
+        plateau.create_line(3,3,largeur,3, width = 2)
+        plateau.create_line(3,hauteur+1,largeur,hauteur+1, width = 2)
+        plateau.create_line(largeur,2,largeur,hauteur+2, width = 2)
+        for loop in range(0,largeur,int(largeur/nb_colonne)):
+            plateau.create_line(loop,0,loop,hauteur, width = 2)
+        for loop in range(0,hauteur,int(hauteur/nb_ligne)):
+            plateau.create_line(0,loop,largeur,loop, width = 2)
+
+
+def quitter():
+    """Ferme l'ensemble du programme"""
+    if messagebox.askokcancel("Attention", "Quitter le jeu va supprimer la partie en cours, assurez vous donc de l'avoir sauvegardée si vous souhaitez la continuer. \nVoulez-vous vraiment quitter ?") == True:
+            try:
+                fen_review.destroy()					#Si la fenêtre de review est active, on la supprime
+            except:
+                pass
+            finally:
+                fen.destroy()							#On supprime dans tous les cas la fenêtre de jeu
+                
+
+def testvictoire(coordCol, coordLig, joueur):
+    """Vérifie si le joueur qui vient de jouer à gagner avec son coup"""
+    
+    if coup == 42:
+        return("nul")
+    else:
+        nb_jeton = 1
+        if coordLig > 2: #Test pour un alignement vertical
+            for i in range(1,4):
+                if tableau[coordCol][coordLig-i] == joueur:
+                    nb_jeton += 1
+            if nb_jeton >= 4:
+                return(True)
+        nb_jeton = 1
+        #Test pour un alignement horizontal
+        for i in range(1, 7-coordCol):
+            if tableau[coordCol+i][coordLig] == joueur:
+                nb_jeton +=1
+            else:
+                break
+        for i in range(1, coordCol+1):
+            if tableau[coordCol-i][coordLig] == joueur:
+                nb_jeton +=1
+            else:
+                break
+        if nb_jeton >= 4:
+            return(True)
+        nb_jeton = 1
+        #Test pour un alignement croissant
+        for i in range(1, min(7-coordCol,6-coordLig)):
+            if tableau[coordCol+i][coordLig+i] == joueur:
+                nb_jeton +=1
+            else:
+                break
+        for i in range(1, min(coordCol+1,coordLig+1)):
+            if tableau[coordCol-i][coordLig-i] == joueur:
+                nb_jeton +=1
+            else:
+                break
+        if nb_jeton >= 4:
+            return(True)
+        nb_jeton = 1
+        #Test pour un alignement décroissant
+        for i in range(1, min(7-coordCol,coordLig+1)):
+            if tableau[coordCol+i][coordLig-i] == joueur:
+                nb_jeton +=1
+            else:
+                break
+        for i in range(1, min(coordCol+1,6-coordLig)):
+            if tableau[coordCol-i][coordLig+i] == joueur:
+                nb_jeton +=1
+            else:
+                break
+        if nb_jeton >= 4:
+            return(True)
+        #Aucun test n'a marché, auncun joueur n'a gagné, le jeu peut continuer.
+        return(False)
+
+def joueurjoue(event):
+    """Permet au jeu de se dérouler"""
+    global tableau
+    global tableau_partie
+    global coup                                                     #Grâce aux variables globales, on peut les modifier facilement depuis l'intérieur de la fonction
+    global joueur
+    global victoire
+    colonne = floor(event.x/(largeur/nb_colonne))                   #On détermine d'abord en fonction de l'endroit où le joueur a cliqué la colonne et la ligne de son nouveau pion
+    ligne = "FALSE"													#Cette variable sert à relancer la fonction si le joueur esaie de jouer sur une colonne pleine
+    for loop in range(len(tableau[colonne])):  
+            if tableau[colonne][loop]==0:
+                tableau[colonne][loop] = joueur 					#On change la première valeur égale à 0 de la "sous-liste" par le numéro du joueur
+                ligne = loop
+                numero = str(colonne)+","+str(ligne)				#On injecte dans 'numero' le numéro de colonne et de ligne du pion qui est joué sous forme d'une unique chaîne de caractères
+                tableau_partie.append(numero)						#On enregistre les coordonnées du coup
+                break
+    if ligne == "FALSE":                                            #Ce cas va arriver si la colonne est déjà pleine. return permet donc ici de relancer le tour du jour ayant appuyé sur une colonne pleine
+        return                                                      #Cependant, il ne faut pas utiliser de Booléen (True, False), car ligne peut prendre les valeurs 0 et 1, qui fausseront alors le test ;)
+    coup += 1
+    rayon_cercle =((min(hauteur/nb_ligne, largeur/nb_colonne))/3)   #La suite permet d'afficher le coup joué (A Améliorer par une animation)
+    milieu_x = colonne*(largeur/nb_colonne) + (largeur/nb_colonne)/2
+    milieu_y = ((ligne-nb_ligne)*-1)*(hauteur/nb_ligne) - (hauteur/nb_ligne)/2
+    if joueur == 1:
+        color = "#FF0000"
+    elif joueur == 2:
+        color = "#DDDD00"
+    plateau.create_oval(milieu_x-rayon_cercle, milieu_y-rayon_cercle ,milieu_x+rayon_cercle,milieu_y+rayon_cercle, fill=color)
+    victoire = testvictoire(colonne, ligne, joueur)                 #On vérifie si la partie est terminée : si oui, on affiche à l'écran la raison de la victoire (nul ou gagné)
+    if victoire == "nul":                                           #Cas du match nul
+        tableau_partie[0] = "Nul"										
+        can_compteur.create_rectangle(0,0,largeur, 40, fill="#FFFFFF", width=0)
+        can_compteur.create_text(largeur/2,20, text = "C'est un match nul !", font=("Courier New",15,"bold"))
+    elif victoire == True:                                          #Cas d'une victoire
+        for loop in range(nb_colonne):                              #Les quatres lignes qui suivent bloquent le tableau après victoire d'un joueur
+            for loop2 in range(nb_ligne):   
+                if tableau[loop][loop2] == 0:
+                    tableau[loop][loop2] = 3						#Le changement de toutes les valeurs de chaque entrée à 3 empêche tout autre tentative de jeu
+        tableau_partie[0] = "Over"
+        can_compteur.create_rectangle(0,0,largeur, 40, fill="#FFFFFF", width=0)
+        can_compteur.create_text(largeur/2,20, text = "Joueur {} a gagné en {} coups !".format(joueur, coup), font=("Courier New",15,"bold"))
+    elif victoire == False:                                         #La partie continue, on donne la main à l'autre joueur et on modifie la barre d'info
+        can_compteur.create_rectangle(300,0,500,40, fill="#FFFFFF", width=0)
+        can_compteur.create_text(300,20, text = "Nombre de coup : {}".format(coup), anchor = W, font=("Courier New",9,""))
+        if joueur == 1:                                                 
+            joueur = 2
+            can_compteur.create_rectangle(0,0,largeur/4, 40, fill="#FFFFFF", width=0)
+            can_compteur.create_text(20,20, text = "Joueur {} :".format(joueur), anchor = W, font=("Courier New",9,""))
+            can_compteur.create_oval(110-10, 20-10, 110+10, 20+10, fill="#DDDD00")
+        elif joueur == 2:
+            joueur = 1
+            can_compteur.create_rectangle(0,0,largeur/4, 40, fill="#FFFFFF", width=0)
+            can_compteur.create_text(20,20, text = "Joueur {} :".format(joueur), anchor = W, font=("Courier New",9,""))
+            can_compteur.create_oval(110-10, 20-10, 110+10, 20+10, fill="#FF0000")
+
+
+
+#Pour les sauvegardes de parties
+os.chdir(os.getcwd())           									#On se place dans le dossier contenant ce fichier            
+with open("parties enregistrées.txt", "rb") as save:				#On ouvre à cet emplacement le fichier 'parties enregistrées.txt' en tant que 'save' en lecture sous forme binaire
+    parties_save = pickle.Unpickler(save).load()				#On injecte le contenu de 'save' après l'avoir dé-sérialisé avec la classe unpickle dans 'parties_save' après avoir reconstitué la hiérarchie de l'objet avec la méthode load
+
+#Les variables mathématiques à la base du jeu
+tableau_partie = ["Running"]										#Liste faisant office d'historique de la partie et comprenant les coordonnées du pion joué à chaque tour précédé d'une chaîne de caractère décrivant l'état de la partie
+tableau = [[0 for ligne in range (6)] for colonne in range (7)]
+victoire = False
+joueur = 1
+coup = 0
+#Les variables graphiques à la base du jeu
+nb_ligne = 6
+nb_colonne = 7
+hauteur = 672
+largeur = 1050
+
+fen = Tk(className = "Puissance 4") #On crée l'interface graphique
+main_Frame = Frame(fen)
+
+Frame_right = Frame(main_Frame)
+can_commande = Canvas(Frame_right, width = 200, height = hauteur+40, background = "#FFFFFF") #On crée la barre de droite où l'on va pouvoir sélectionner des commandes avec plein de boutons !!
+can_commande.create_line(10,200,185,200, width = 1)
+Butt_restart = Button(can_commande, text ="  Recommencer  ", command = recommencer, relief = RAISED, font=("Courier New",9,""))
+Butt_restart_window = can_commande.create_window(200/2, 100, anchor=N, window=Butt_restart)
+Butt_launch = Button(can_commande, text ="    Charger    ", command = charger, relief = RAISED, font=("Courier New",9,""))
+Butt_launch_window = can_commande.create_window(200/2, 10, anchor=N, window=Butt_launch)
+Butt_save = Button(can_commande, text ="  Enregistrer  ", command = enregistrer, relief = RAISED, font=("Courier New",9,""))
+Butt_save_window = can_commande.create_window(200/2, 40, anchor=N, window=Butt_save)
+Butt_quit = Button(can_commande, text =" Quitter le jeu ", command = quitter, relief = RAISED, font=("Courier New",9,""))
+Butt_quit_window = can_commande.create_window(200/2, 160, anchor=N, window=Butt_quit)
+Butt_annuler_coup = Button(can_commande, text ="Annuler le coup", command = annuler_coup, relief = RAISED, font=("Courier New",9,""))
+Butt_annuler_coup_window = can_commande.create_window(200/2, 70, anchor=N, window=Butt_annuler_coup)
+can_commande.pack(side = TOP)
+Frame_right.pack(side = RIGHT)
+
+Frame_left = Frame(main_Frame)
+can_compteur = Canvas(Frame_left, width = largeur, height = 40, background = "#FFFFFF")     #On crée la barre d'info au dessus du plateau qui indique le joueur qui doit jouer, le nombre de coup etc...
+can_compteur.create_text(300,20, text = "Nombre de coup : {}".format(coup), anchor = W, font=("Courier New",9,""))
+can_compteur.create_text(20,20, text = "Joueur 1 :", anchor = W, font=("Courier New",9,""))
+can_compteur.create_oval(110-10, 20-10, 110+10, 20+10, fill="#FF0000")
+can_compteur.pack(side = TOP)
+plateau = Canvas(Frame_left, width = largeur, height = hauteur, background = "#FFFFFF")     #On crée le plateau de jeu
+plateau.bind("<Button-1>", joueurjoue)          #La fonction joueurjoue (séparée en deux fonctions pour faciliter la compréhension) constitue la totalité du fonctionnement mathématique du jeu
+plateau.create_line(3,2,3,hauteur+2, width = 2) #A partir d'ici on affiche les lignes de base du plateau avant de lancer le mainloop
+plateau.create_line(3,3,largeur,3, width = 2)
+plateau.create_line(3,hauteur+1,largeur,hauteur+1, width = 2)
+plateau.create_line(largeur,2,largeur,hauteur+2, width = 2)
+for loop in range(0,largeur,int(largeur/nb_colonne)):
+    plateau.create_line(loop,0,loop,hauteur, width = 2)
+for loop in range(0,hauteur,int(hauteur/nb_ligne)):
+    plateau.create_line(0,loop,largeur,loop, width = 2)
+plateau.pack(side = TOP)
+Frame_left.pack(side = LEFT)
+
+main_Frame.pack()
+fen.mainloop()
