@@ -356,20 +356,20 @@ def testvictoire(coordCol, coordLig, joueur):
                 return(True)
         nb_jeton = 1
         #Test pour un alignement horizontal
-        for i in range(1, 7-coordCol):
-            if tableau[coordCol+i][coordLig] == joueur:
+          for i in range(1, 7-coordCol):
+            if tableau[coordCol+i][coordLig] == joueur:				#Test pour un alignement horizontal à droite du pion
                 nb_jeton +=1
             else:
                 break
         for i in range(1, coordCol+1):
-            if tableau[coordCol-i][coordLig] == joueur:
+            if tableau[coordCol-i][coordLig] == joueur:				#Test pour un alignement horizontal à gauche du pion
                 nb_jeton +=1
             else:
                 break
         if nb_jeton >= 4:
             return(True)
         nb_jeton = 1
-        #Test pour un alignement croissant
+        #Test pour un alignement diagonal croissant
         for i in range(1, min(7-coordCol,6-coordLig)):
             if tableau[coordCol+i][coordLig+i] == joueur:
                 nb_jeton +=1
